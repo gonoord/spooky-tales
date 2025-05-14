@@ -38,7 +38,7 @@ const imageHints: string[] = [
   "empty void", "old clock", "deep well", "creepy doll", "corn field", "window face",
   "locked door", "dancing shadows", "old grave", "ghost train", "icy chill", "forest path",
   "ancient book", "dark mirror", "cold wind", "ghostly touch", "attic cobwebs", "eerie child",
-  "hidden road", "deep woods", "creaking floor", "black feather", "gas lamp", "under bed",
+  "hidden road", "deep woods", "creaking floor", "black feather", "gas lamp", "bed monster", // "under bed" changed to "bed monster" for variety
   "old asylum", "mournful song", "moving scarecrow", "cryptic note", "swamp glow", "key hole",
   "watching painting", "empty echo", "stopped clock", "howling wolf", "cellar door", "thick fog",
   "old photo", "secret passage", "wall knocking", "spectral form", "music box", "sea cave",
@@ -65,13 +65,12 @@ const generateInitialCards = (count: number): StoryCardData[] => {
     usedPhrases.add(phrase);
     usedImageHints.add(hint);
     
-    // Ensure imageHint is two words max
     const hintWords = hint.split(" ");
     const finalHint = hintWords.slice(0, 2).join(" ");
 
     cards.push({
-      id: String(i + 1),
-      imageUrl: `https://placehold.co/400x600.png`, // Standard placeholder
+      id: String(i + 1), // Simple numeric IDs for initial cards
+      imageUrl: `https://placehold.co/400x600.png`, 
       phrase: phrase,
       imageHint: finalHint,
     });
@@ -82,7 +81,7 @@ const generateInitialCards = (count: number): StoryCardData[] => {
 
 const initialCardsData: StoryCardData[] = generateInitialCards(50);
 
-const CARDS_STORAGE_KEY = "spookyTalesCards_v2"; // Changed key to ensure users get new set
+const CARDS_STORAGE_KEY = "spookyTalesCards_v3"; // Incremented key to ensure new storage logic takes effect
 
 export default function HomePage() {
   const [cards, setCards] = useState<StoryCardData[]>([]);
@@ -94,15 +93,14 @@ export default function HomePage() {
   const [isMounted, setIsMounted] = useState(false);
   const { toast } = useToast();
 
-  const shuffleArray = <T,>(array: T[]): T[] => {
+  const shuffleArray = useCallback(<T,>(array: T[]): T[] => {
     const newArray = [...array];
     for (let i = newArray.length - 1; i > 0; i--) {
-      // Ensure Math.random is only called client-side
       const j = isMounted ? Math.floor(Math.random() * (i + 1)) : 0;
       [newArray[i], newArray[j]] = [newArray[j], newArray[i]];
     }
     return newArray;
-  };
+  }, [isMounted]); // Added isMounted to dependency array
   
   useEffect(() => {
     setIsMounted(true);
@@ -112,32 +110,55 @@ export default function HomePage() {
       try {
         loadedCards = JSON.parse(storedCardsRaw);
          if (!Array.isArray(loadedCards) || loadedCards.length === 0) {
-          loadedCards = initialCardsData; // Fallback to new initial data
+          loadedCards = initialCardsData; 
         }
       } catch (error) {
         console.error("Failed to parse cards from localStorage", error);
-        loadedCards = initialCardsData; // Fallback to new initial data
+        loadedCards = initialCardsData; 
       }
     } else {
-      loadedCards = initialCardsData; // New users get the 50 cards
+      loadedCards = initialCardsData; 
     }
-    // Shuffle on initial load
     setCards(shuffleArray(loadedCards));
     setCurrentIndex(0);
-  }, []); // isMounted will be set after this effect, shuffleArray check for isMounted prevents SSR Math.random
+  }, [shuffleArray]); // Removed isMounted, shuffleArray handles it
 
   useEffect(() => {
     if (isMounted && cards.length > 0) {
-      localStorage.setItem(CARDS_STORAGE_KEY, JSON.stringify(cards));
+      const cardsToStore = cards.map(card => {
+        // Check if the card ID is purely numeric (initial card) and has a generated image
+        const isInitialGeneratedCard = /^\d+$/.test(card.id) && card.imageUrl.startsWith('data:image');
+        if (isInitialGeneratedCard) {
+          // Revert to placeholder for storage to save space
+          return {
+            ...card,
+            imageUrl: `https://placehold.co/400x600.png` 
+          };
+        }
+        // For user-added cards (with their own base64 images) or initial cards that haven't had images generated yet, store as is.
+        return card;
+      });
+
+      try {
+        localStorage.setItem(CARDS_STORAGE_KEY, JSON.stringify(cardsToStore));
+      } catch (error) {
+        console.error("Error saving cards to localStorage:", error);
+        toast({
+          title: "Storage Full",
+          description: "Could not save all card data due to storage limits. Some generated images might not persist across sessions. User-added cards are prioritized.",
+          variant: "destructive",
+        });
+      }
     }
-  }, [cards, isMounted]);
+  }, [cards, isMounted, toast]);
 
   const generateImageForCardAtIndex = useCallback(async (index: number) => {
     if (index < 0 || index >= cards.length) return;
     const cardToUpdate = cards[index];
 
+    // Only generate if it's a placeholder URL
     if (!cardToUpdate.imageUrl.startsWith('https://placehold.co')) {
-      return; // Already has a generated or uploaded image
+      return; 
     }
 
     setIsGeneratingCardImage(true);
@@ -164,11 +185,12 @@ export default function HomePage() {
       return;
     }
     const currentCard = cards[currentIndex];
+    // Check if the current card's image is a placeholder before generating
     if (currentCard && currentCard.imageUrl.startsWith('https://placehold.co')) {
       generateImageForCardAtIndex(currentIndex);
     }
   // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [currentIndex, isMounted, cards.length, generateImageForCardAtIndex]); // Removed 'cards' from deps, added cards.length
+  }, [currentIndex, isMounted, cards.length, generateImageForCardAtIndex]);
 
   const handleNextCard = useCallback(() => {
     if (cards.length === 0) return;
@@ -182,7 +204,7 @@ export default function HomePage() {
     setCurrentIndex(0);
     setStoryStarter(null);
     toast({ title: "Deck Shuffled", description: "The cards have been reordered." });
-  }, [cards.length, toast, shuffleArray]); // Added shuffleArray to deps
+  }, [cards.length, toast, shuffleArray]);
 
   const handleGetStoryStarter = useCallback(async () => {
     if (cards.length === 0 || currentIndex >= cards.length) return;
@@ -193,7 +215,9 @@ export default function HomePage() {
 
     try {
       let imageBase64 = currentCard.imageUrl;
-      if (currentCard.imageUrl.startsWith('http') && !currentCard.imageUrl.startsWith('data:')) { // Check if it's a remote URL and not already a data URI
+      // If it's a remote URL (like placehold.co) and not a data URI, fetch and convert.
+      // This ensures that if image generation failed or was skipped, we can still use the placeholder with the story AI.
+      if (currentCard.imageUrl.startsWith('http') && !currentCard.imageUrl.startsWith('data:')) { 
         const response = await fetch(currentCard.imageUrl);
         if (!response.ok) throw new Error(`Failed to fetch image: ${response.statusText}`);
         const blob = await response.blob();
@@ -206,7 +230,7 @@ export default function HomePage() {
       }
       
       const result = await generateStoryStarter({
-        image: imageBase64,
+        image: imageBase64, // This will be a data URI (either generated, uploaded, or fetched placeholder)
         phrase: currentCard.phrase,
       });
       setStoryStarter(result.storyStarter);
@@ -222,16 +246,21 @@ export default function HomePage() {
     }
   }, [cards, currentIndex, toast]);
 
-  const handleAddCard = (newCard: StoryCardData) => {
-    const uniqueNewCard = { ...newCard, id: Date.now().toString() + Math.random().toString(36).substring(2,9) };
+  const handleAddCard = (newCardData: Omit<StoryCardData, 'id'>) => {
+    // Ensure user-added cards get a non-numeric, unique ID
+    const uniqueNewCard: StoryCardData = { 
+      ...newCardData, 
+      id: `user-${Date.now().toString()}-${Math.random().toString(36).substring(2,9)}` 
+    };
     setCards((prevCards) => {
         const updatedCards = [uniqueNewCard, ...prevCards]; 
         return updatedCards;
     });
     setCurrentIndex(0); 
     setStoryStarter(null);
-    // Image for new card will be generated if it's a placeholder when it becomes current.
-    // The new card is now at index 0, so the image generation useEffect for currentIndex will trigger for it.
+    // If the user-added card used a placeholder (e.g., didn't upload an image but we add that feature later),
+    // the image generation useEffect for currentIndex would trigger for it.
+    // Currently, AddCardDialog forces image upload, so newCardData.imageUrl will be a data URI.
   };
 
   if (!isMounted) {
@@ -244,6 +273,7 @@ export default function HomePage() {
   }
   
   const currentCard = cards.length > 0 ? cards[currentIndex] : null;
+  // Show loader if the current card has a placeholder URL AND we are actively trying to generate an image for it.
   const showImageGenerationLoader = !!currentCard && currentCard.imageUrl.startsWith('https://placehold.co') && isGeneratingCardImage;
 
 
@@ -273,8 +303,8 @@ export default function HomePage() {
           onNext={handleNextCard}
           onShuffle={handleShuffleCards}
           onGetStoryStarter={handleGetStoryStarter}
-          isAILoading={isLoadingAIStory || isGeneratingCardImage} // Combine loading states for AI button
-          canGetStory={!!currentCard}
+          isAILoading={isLoadingAIStory || isGeneratingCardImage} 
+          canGetStory={!!currentCard && !showImageGenerationLoader} // Disable story if image is still generating
         />
 
         {storyStarter && (
@@ -299,4 +329,3 @@ export default function HomePage() {
     </div>
   );
 }
-
