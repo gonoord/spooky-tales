@@ -14,15 +14,75 @@ import type { StoryCardData } from "@/types";
 import { useToast } from "@/hooks/use-toast";
 import { Loader2 } from "lucide-react";
 
-const initialCardsData: StoryCardData[] = [
-  { id: '1', imageUrl: 'https://placehold.co/400x600/101218/e0e0e0.png', phrase: 'Whispering Shadows', imageHint: 'dark forest' },
-  { id: '2', imageUrl: 'https://placehold.co/400x600/121015/d0d0d0.png', phrase: 'The Attic Door Creaks', imageHint: 'attic door' },
-  { id: '3', imageUrl: 'https://placehold.co/400x600/0f1412/f0f0f0.png', phrase: 'Eyes in the Dark Mirror', imageHint: 'glowing eyes' },
-  { id: '4', imageUrl: 'https://placehold.co/400x600/181010/e5e5e5.png', phrase: 'Forgotten Lullaby', imageHint: 'music box' },
-  { id: '5', imageUrl: 'https://placehold.co/400x600/131313/cccccc.png', phrase: 'The Scarecrow Smiles', imageHint: 'eerie scarecrow' },
+const phrases: string[] = [
+  "Footsteps in the void", "The old clock chimed thirteen", "A whisper from the well",
+  "The doll's eyes followed", "Rustling in the cornfield", "A face in the window",
+  "The locked room upstairs", "Shadows danced alone", "A forgotten grave",
+  "The last train's whistle", "Chills down the spine", "The forest path beckons",
+  "An ancient, dusty tome", "The mirror showed too much", "A sudden, cold breeze",
+  "Unseen hands touched", "The attic's secrets", "A child's eerie laughter",
+  "The road less traveled", "Deep in the woods", "The creaking floorboards",
+  "A single, black feather", "The flickering gaslight", "Something under the bed",
+  "The abandoned asylum", "A distant, mournful song", "The scarecrow moved",
+  "A cryptic message", "The swamp's strange glow", "Through the keyhole",
+  "The painting watched", "Echoes in the silence", "The grandfather clock stopped",
+  "A lone wolf howled", "The cellar door creaked", "Mysterious fog rolled in",
+  "A strange, old photograph", "The hidden passage", "Knocking from inside walls",
+  "The spectral figure", "A broken music box", "The seaside cave",
+  "Whispers in the library", "The moon turned blood red", "A lonely lighthouse beam",
+  "The haunted carnival", "Footprints in the dust", "The silent telephone rang",
+  "An old, gnarled tree", "The empty swing set"
 ];
 
-const CARDS_STORAGE_KEY = "spookyTalesCards";
+const imageHints: string[] = [
+  "empty void", "old clock", "deep well", "creepy doll", "corn field", "window face",
+  "locked door", "dancing shadows", "old grave", "ghost train", "icy chill", "forest path",
+  "ancient book", "dark mirror", "cold wind", "ghostly touch", "attic cobwebs", "eerie child",
+  "hidden road", "deep woods", "creaking floor", "black feather", "gas lamp", "under bed",
+  "old asylum", "mournful song", "moving scarecrow", "cryptic note", "swamp glow", "key hole",
+  "watching painting", "empty echo", "stopped clock", "howling wolf", "cellar door", "thick fog",
+  "old photo", "secret passage", "wall knocking", "spectral form", "music box", "sea cave",
+  "dusty library", "blood moon", "lighthouse beam", "haunted fair", "dusty prints", "ringing phone",
+  "gnarled tree", "empty swing"
+];
+
+const generateInitialCards = (count: number): StoryCardData[] => {
+  const cards: StoryCardData[] = [];
+  const usedPhrases = new Set<string>();
+  const usedImageHints = new Set<string>();
+
+  for (let i = 0; i < count; i++) {
+    let phrase = phrases[i % phrases.length];
+    let hint = imageHints[i % imageHints.length];
+    let attempt = 0;
+
+    // Ensure unique enough phrases/hints if lists are shorter than count
+    while ((usedPhrases.has(phrase) || usedImageHints.has(hint)) && attempt < phrases.length) {
+        phrase = phrases[(i + attempt) % phrases.length];
+        hint = imageHints[(i + attempt) % imageHints.length];
+        attempt++;
+    }
+    usedPhrases.add(phrase);
+    usedImageHints.add(hint);
+    
+    // Ensure imageHint is two words max
+    const hintWords = hint.split(" ");
+    const finalHint = hintWords.slice(0, 2).join(" ");
+
+    cards.push({
+      id: String(i + 1),
+      imageUrl: `https://placehold.co/400x600.png`, // Standard placeholder
+      phrase: phrase,
+      imageHint: finalHint,
+    });
+  }
+  return cards;
+};
+
+
+const initialCardsData: StoryCardData[] = generateInitialCards(50);
+
+const CARDS_STORAGE_KEY = "spookyTalesCards_v2"; // Changed key to ensure users get new set
 
 export default function HomePage() {
   const [cards, setCards] = useState<StoryCardData[]>([]);
@@ -37,32 +97,34 @@ export default function HomePage() {
   const shuffleArray = <T,>(array: T[]): T[] => {
     const newArray = [...array];
     for (let i = newArray.length - 1; i > 0; i--) {
-      const j = Math.floor(Math.random() * (i + 1));
+      // Ensure Math.random is only called client-side
+      const j = isMounted ? Math.floor(Math.random() * (i + 1)) : 0;
       [newArray[i], newArray[j]] = [newArray[j], newArray[i]];
     }
     return newArray;
   };
-
+  
   useEffect(() => {
+    setIsMounted(true);
     const storedCardsRaw = localStorage.getItem(CARDS_STORAGE_KEY);
     let loadedCards: StoryCardData[];
     if (storedCardsRaw) {
       try {
         loadedCards = JSON.parse(storedCardsRaw);
          if (!Array.isArray(loadedCards) || loadedCards.length === 0) {
-          loadedCards = initialCardsData;
+          loadedCards = initialCardsData; // Fallback to new initial data
         }
       } catch (error) {
         console.error("Failed to parse cards from localStorage", error);
-        loadedCards = initialCardsData;
+        loadedCards = initialCardsData; // Fallback to new initial data
       }
     } else {
-      loadedCards = initialCardsData;
+      loadedCards = initialCardsData; // New users get the 50 cards
     }
+    // Shuffle on initial load
     setCards(shuffleArray(loadedCards));
     setCurrentIndex(0);
-    setIsMounted(true);
-  }, []);
+  }, []); // isMounted will be set after this effect, shuffleArray check for isMounted prevents SSR Math.random
 
   useEffect(() => {
     if (isMounted && cards.length > 0) {
@@ -95,7 +157,7 @@ export default function HomePage() {
     } finally {
       setIsGeneratingCardImage(false);
     }
-  }, [cards, toast]); // generateImageForCardAtIndex depends on `cards` to correctly map and update
+  }, [cards, toast]); 
 
   useEffect(() => {
     if (!isMounted || cards.length === 0 || currentIndex >= cards.length || isGeneratingCardImage) {
@@ -106,7 +168,7 @@ export default function HomePage() {
       generateImageForCardAtIndex(currentIndex);
     }
   // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [currentIndex, isMounted, cards, generateImageForCardAtIndex]); // Added generateImageForCardAtIndex, isGeneratingCardImage to deps
+  }, [currentIndex, isMounted, cards.length, generateImageForCardAtIndex]); // Removed 'cards' from deps, added cards.length
 
   const handleNextCard = useCallback(() => {
     if (cards.length === 0) return;
@@ -120,7 +182,7 @@ export default function HomePage() {
     setCurrentIndex(0);
     setStoryStarter(null);
     toast({ title: "Deck Shuffled", description: "The cards have been reordered." });
-  }, [cards.length, toast]);
+  }, [cards.length, toast, shuffleArray]); // Added shuffleArray to deps
 
   const handleGetStoryStarter = useCallback(async () => {
     if (cards.length === 0 || currentIndex >= cards.length) return;
@@ -161,13 +223,15 @@ export default function HomePage() {
   }, [cards, currentIndex, toast]);
 
   const handleAddCard = (newCard: StoryCardData) => {
+    const uniqueNewCard = { ...newCard, id: Date.now().toString() + Math.random().toString(36).substring(2,9) };
     setCards((prevCards) => {
-      const updatedCards = [newCard, ...prevCards]; 
-      return updatedCards;
+        const updatedCards = [uniqueNewCard, ...prevCards]; 
+        return updatedCards;
     });
     setCurrentIndex(0); 
     setStoryStarter(null);
     // Image for new card will be generated if it's a placeholder when it becomes current.
+    // The new card is now at index 0, so the image generation useEffect for currentIndex will trigger for it.
   };
 
   if (!isMounted) {
@@ -235,3 +299,4 @@ export default function HomePage() {
     </div>
   );
 }
+
