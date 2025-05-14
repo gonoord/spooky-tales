@@ -1,3 +1,4 @@
+
 "use client";
 
 import { useState, useEffect, useCallback } from "react";
@@ -8,6 +9,7 @@ import AddCardDialog from "@/components/core/AddCardDialog";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { generateStoryStarter } from "@/ai/flows/generate-story-starter";
+import { generateCardImage } from "@/ai/flows/generate-card-image";
 import type { StoryCardData } from "@/types";
 import { useToast } from "@/hooks/use-toast";
 import { Loader2 } from "lucide-react";
@@ -26,7 +28,8 @@ export default function HomePage() {
   const [cards, setCards] = useState<StoryCardData[]>([]);
   const [currentIndex, setCurrentIndex] = useState(0);
   const [storyStarter, setStoryStarter] = useState<string | null>(null);
-  const [isLoadingAI, setIsLoadingAI] = useState(false);
+  const [isLoadingAIStory, setIsLoadingAIStory] = useState(false);
+  const [isGeneratingCardImage, setIsGeneratingCardImage] = useState(false);
   const [isAddCardDialogOpen, setIsAddCardDialogOpen] = useState(false);
   const [isMounted, setIsMounted] = useState(false);
   const { toast } = useToast();
@@ -67,9 +70,47 @@ export default function HomePage() {
     }
   }, [cards, isMounted]);
 
+  const generateImageForCardAtIndex = useCallback(async (index: number) => {
+    if (index < 0 || index >= cards.length) return;
+    const cardToUpdate = cards[index];
+
+    if (!cardToUpdate.imageUrl.startsWith('https://placehold.co')) {
+      return; // Already has a generated or uploaded image
+    }
+
+    setIsGeneratingCardImage(true);
+    try {
+      const result = await generateCardImage({ imageHint: cardToUpdate.imageHint });
+      const updatedCards = cards.map((card, i) =>
+        i === index ? { ...card, imageUrl: result.imageDataUri } : card
+      );
+      setCards(updatedCards);
+    } catch (error) {
+      console.error("Error generating card image:", error);
+      toast({
+        title: "Card Image Error",
+        description: "Could not generate an image for the card. Placeholder will be used.",
+        variant: "destructive",
+      });
+    } finally {
+      setIsGeneratingCardImage(false);
+    }
+  }, [cards, toast]); // generateImageForCardAtIndex depends on `cards` to correctly map and update
+
+  useEffect(() => {
+    if (!isMounted || cards.length === 0 || currentIndex >= cards.length || isGeneratingCardImage) {
+      return;
+    }
+    const currentCard = cards[currentIndex];
+    if (currentCard && currentCard.imageUrl.startsWith('https://placehold.co')) {
+      generateImageForCardAtIndex(currentIndex);
+    }
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [currentIndex, isMounted, cards, generateImageForCardAtIndex]); // Added generateImageForCardAtIndex, isGeneratingCardImage to deps
+
   const handleNextCard = useCallback(() => {
     if (cards.length === 0) return;
-    setStoryStarter(null); // Clear previous story starter
+    setStoryStarter(null); 
     setCurrentIndex((prevIndex) => (prevIndex + 1) % cards.length);
   }, [cards.length]);
 
@@ -85,13 +126,12 @@ export default function HomePage() {
     if (cards.length === 0 || currentIndex >= cards.length) return;
 
     const currentCard = cards[currentIndex];
-    setIsLoadingAI(true);
+    setIsLoadingAIStory(true);
     setStoryStarter(null);
 
     try {
       let imageBase64 = currentCard.imageUrl;
-      // If it's an HTTP URL (like placehold.co), fetch and convert to base64
-      if (currentCard.imageUrl.startsWith('http')) {
+      if (currentCard.imageUrl.startsWith('http') && !currentCard.imageUrl.startsWith('data:')) { // Check if it's a remote URL and not already a data URI
         const response = await fetch(currentCard.imageUrl);
         if (!response.ok) throw new Error(`Failed to fetch image: ${response.statusText}`);
         const blob = await response.blob();
@@ -111,22 +151,23 @@ export default function HomePage() {
     } catch (error) {
       console.error("Error generating story starter:", error);
       toast({
-        title: "AI Error",
+        title: "AI Story Error",
         description: "Could not generate a story starter. Please try again.",
         variant: "destructive",
       });
     } finally {
-      setIsLoadingAI(false);
+      setIsLoadingAIStory(false);
     }
   }, [cards, currentIndex, toast]);
 
   const handleAddCard = (newCard: StoryCardData) => {
     setCards((prevCards) => {
-      const updatedCards = [newCard, ...prevCards]; // Add new card to the beginning
+      const updatedCards = [newCard, ...prevCards]; 
       return updatedCards;
     });
-    setCurrentIndex(0); // Show the new card
+    setCurrentIndex(0); 
     setStoryStarter(null);
+    // Image for new card will be generated if it's a placeholder when it becomes current.
   };
 
   if (!isMounted) {
@@ -139,6 +180,8 @@ export default function HomePage() {
   }
   
   const currentCard = cards.length > 0 ? cards[currentIndex] : null;
+  const showImageGenerationLoader = !!currentCard && currentCard.imageUrl.startsWith('https://placehold.co') && isGeneratingCardImage;
+
 
   return (
     <div className="flex flex-col min-h-screen bg-background">
@@ -146,10 +189,11 @@ export default function HomePage() {
       <main className="flex-grow container mx-auto px-4 py-8 flex flex-col items-center">
         {currentCard ? (
           <StoryCardDisplay
-            key={currentCard.id} // Ensures animation on card change
+            key={currentCard.id} 
             imageUrl={currentCard.imageUrl}
             phrase={currentCard.phrase}
             imageHint={currentCard.imageHint}
+            isGeneratingImage={showImageGenerationLoader}
           />
         ) : (
           <Card className="w-full max-w-sm mx-auto bg-card shadow-xl flex flex-col items-center justify-center aspect-[2/3]">
@@ -165,7 +209,7 @@ export default function HomePage() {
           onNext={handleNextCard}
           onShuffle={handleShuffleCards}
           onGetStoryStarter={handleGetStoryStarter}
-          isAILoading={isLoadingAI}
+          isAILoading={isLoadingAIStory || isGeneratingCardImage} // Combine loading states for AI button
           canGetStory={!!currentCard}
         />
 
