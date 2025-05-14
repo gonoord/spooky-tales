@@ -13,10 +13,10 @@ import { useToast } from "@/hooks/use-toast";
 import { Loader2 } from "lucide-react";
 
 const initialCardsData: StoryCardData[] = [
-  { id: '1', imageUrl: 'https://placehold.co/400x600/101218/e0e0e0.png', phrase: 'Whispering Shadows', imageHint: 'dark forest silhouette' },
-  { id: '2', imageUrl: 'https://placehold.co/400x600/121015/d0d0d0.png', phrase: 'The Attic Door Creaks', imageHint: 'creepy attic door' },
-  { id: '3', imageUrl: 'https://placehold.co/400x600/0f1412/f0f0f0.png', phrase: 'Eyes in the Dark Mirror', imageHint: 'glowing eyes reflection' },
-  { id: '4', imageUrl: 'https://placehold.co/400x600/181010/e5e5e5.png', phrase: 'Forgotten Lullaby', imageHint: 'old music box' },
+  { id: '1', imageUrl: 'https://placehold.co/400x600/101218/e0e0e0.png', phrase: 'Whispering Shadows', imageHint: 'dark forest' },
+  { id: '2', imageUrl: 'https://placehold.co/400x600/121015/d0d0d0.png', phrase: 'The Attic Door Creaks', imageHint: 'attic door' },
+  { id: '3', imageUrl: 'https://placehold.co/400x600/0f1412/f0f0f0.png', phrase: 'Eyes in the Dark Mirror', imageHint: 'glowing eyes' },
+  { id: '4', imageUrl: 'https://placehold.co/400x600/181010/e5e5e5.png', phrase: 'Forgotten Lullaby', imageHint: 'music box' },
   { id: '5', imageUrl: 'https://placehold.co/400x600/131313/cccccc.png', phrase: 'The Scarecrow Smiles', imageHint: 'eerie scarecrow' },
 ];
 

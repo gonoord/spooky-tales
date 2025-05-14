@@ -118,16 +118,16 @@ export default function AddCardDialog({ isOpen, onOpenChange, onAddCard }: AddCa
           </div>
           <div className="grid gap-2">
             <Label htmlFor="image" className="text-foreground">Creepy Image</Label>
-            <Input 
-              id="image" 
-              type="file" 
-              accept="image/png, image/jpeg, image/webp, image/gif" 
-              onChange={handleImageChange} 
+            <Input
+              id="image"
+              type="file"
+              accept="image/png, image/jpeg, image/webp, image/gif"
+              onChange={handleImageChange}
               className="text-foreground file:text-primary file:font-semibold file:mr-2 file:py-1.5 file:px-3 file:rounded-full file:border-0 file:bg-primary/10 hover:file:bg-primary/20"
             />
             {imagePreview && (
               <div className="mt-2 rounded-md overflow-hidden border border-border aspect-[2/3] max-w-[150px] mx-auto">
-                <Image src={imagePreview} alt="Image preview" width={150} height={225} objectFit="cover" />
+                <Image src={imagePreview} alt="Image preview" width={150} height={225} style={{ objectFit: "cover" }} />
               </div>
             )}
           </div>
