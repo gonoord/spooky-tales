@@ -34,7 +34,7 @@ const generateCardImageFlow = ai.defineFlow(
   async (input) => {
     const { media } = await ai.generate({
       model: 'googleai/gemini-2.0-flash-exp', // Using the specified model for image generation
-      prompt: `Generate a very simple, minimalist, basic line drawing or sketch based on the following hint: "${input.imageHint}". The style should be abstract and icon-like, suitable for a spooky story card. Avoid complex details and colors; monochrome (black and white) or duotone with dark, muted colors is preferred. The drawing should be symbolic and evocative, focusing on shapes and atmosphere rather than realism. Ensure the output is just the image.`,
+      prompt: `Generate an image for a spooky story card based on the hint: "${input.imageHint}". The style should be vibrant and eye-catching, reminiscent of classic "Goosebumps" book cover art. Use bold, contrasting colors (like electric greens, deep purples, eerie oranges against dark, shadowy backgrounds) with a playful yet eerie atmosphere. The illustration should be somewhat detailed but maintain a stylized, slightly exaggerated or cartoony look, suitable for a young adult horror theme. Focus on creating a compelling and spooky visual that matches the hint. Ensure the output is just the image.`,
       config: {
         responseModalities: ['TEXT', 'IMAGE'], // Required for this model
          safetySettings: [ // Loosen safety settings slightly for creative content, adjust as needed
@@ -53,3 +53,4 @@ const generateCardImageFlow = ai.defineFlow(
     return { imageDataUri: media.url };
   }
 );
+
